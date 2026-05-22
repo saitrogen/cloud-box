@@ -1,13 +1,25 @@
-name: SSH Cloud Box
-on: workflow_dispatch # Allows you to start it manually with a button
+name: Secure Tailscale Cloud Box
+on: workflow_dispatch
 
 jobs:
-  interactive-ssh:
+  cloud-terminal:
     runs-on: ubuntu-latest
     steps:
-      - name: Checkout Code
-        uses: actions/checkout@v4
+      - name: Connect to Tailscale Network
+        uses: tailscale/github-action@v2
+        with:
+          authkey: ${{ secrets.TAILSCALE_AUTH_KEY }}
 
-      - name: Setup SSH Session
-        uses: mxschmitt/action-tmate@v3
-        timeout-minutes: 360 # Keeps the machine alive for up to 6 hours
+      - name: Setup Password & Sleep
+        run: |
+          # Set a clear terminal password for the runner user
+          echo "runner:CloudPassword123" | sudo chpasswd
+          
+          # Print the machine's assigned private Tailscale IP
+          echo "=========================================================="
+          echo "YOUR CLOUD COMPUTER IS ONLINE IN YOUR TAILSCALE NETWORK!"
+          tailscale ip -4
+          echo "=========================================================="
+          
+          # Keeps the machine alive for up to 6 hours
+          sleep 21600
