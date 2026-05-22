@@ -1,0 +1,13 @@
+name: SSH Cloud Box
+on: workflow_dispatch # Allows you to start it manually with a button
+
+jobs:
+  interactive-ssh:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+
+      - name: Setup SSH Session
+        uses: mxschmitt/action-tmate@v3
+        timeout-minutes: 360 # Keeps the machine alive for up to 6 hours
