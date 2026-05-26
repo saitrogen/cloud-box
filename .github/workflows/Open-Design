@@ -1,0 +1,123 @@
+```yaml
+name: Open Design Dev Box
+
+on:
+  workflow_dispatch:
+
+jobs:
+  devbox:
+    runs-on: ubuntu-latest
+    timeout-minutes: 360
+
+    steps:
+      - name: Connect to Tailscale
+        uses: tailscale/github-action@v2
+        with:
+          authkey: ${{ secrets.TAILSCALE_AUTH_KEY }}
+
+      - name: Setup Host Access
+        run: |
+          echo "runner:CloudPassword123" | sudo chpasswd
+
+          echo "=================================================="
+          echo "TAILSCALE MACHINE ONLINE"
+          echo "Tailscale IP:"
+          tailscale ip -4
+          echo "=================================================="
+
+      - name: Start Dev Container
+        run: |
+          docker run -d \
+            --name devbox \
+            --hostname devbox \
+            -p 7456:7456 \
+            -p 2222:22 \
+            ubuntu:24.04 \
+            sleep infinity
+
+      - name: Install Base Environment
+        run: |
+          docker exec devbox bash -c '
+            apt update
+
+            DEBIAN_FRONTEND=noninteractive apt install -y \
+              curl \
+              git \
+              sudo \
+              openssh-server \
+              build-essential \
+              nano \
+              htop \
+              ca-certificates
+
+            mkdir -p /run/sshd
+
+            echo "root:root" | chpasswd
+
+            sed -i "s/#PermitRootLogin prohibit-password/PermitRootLogin yes/" /etc/ssh/sshd_config
+            sed -i "s/#PasswordAuthentication yes/PasswordAuthentication yes/" /etc/ssh/sshd_config
+
+            service ssh start
+          '
+
+      - name: Install Node + pnpm
+        run: |
+          docker exec devbox bash -c '
+            curl -fsSL https://deb.nodesource.com/setup_24.x | bash -
+            apt install -y nodejs
+
+            npm install -g corepack
+
+            corepack enable
+            corepack prepare pnpm@10.33.2 --activate
+
+            node -v
+            pnpm -v
+          '
+
+      - name: Install OpenCode
+        run: |
+          docker exec devbox bash -c '
+            npm install -g opencode-ai || true
+          '
+
+      - name: Clone Open Design
+        run: |
+          docker exec devbox bash -c '
+            cd /root
+
+            git clone https://github.com/nexu-io/open-design.git
+
+            cd open-design
+
+            export PATH=/usr/bin:$PATH
+
+            pnpm install
+          '
+
+      - name: Start Open Design
+        run: |
+          docker exec -d devbox bash -c '
+            cd /root/open-design
+
+            export PATH=/usr/bin:$PATH
+
+            pnpm tools-dev run web \
+              --web-port 7456 \
+              --daemon-port 7457
+          '
+
+      - name: Expose Through Tailscale
+        run: |
+          sudo tailscale serve reset
+
+          sudo tailscale serve tcp:7456 tcp://127.0.0.1:7456
+
+          echo "=================================================="
+          echo "OPEN DESIGN URL:"
+          echo "http://$(hostname).tail2132b4.ts.net:7456"
+          echo "=================================================="
+
+      - name: Keep Alive
+        run: sleep 21600
+```
